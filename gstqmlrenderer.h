@@ -30,7 +30,7 @@ private:
     QUrl _qmlUrl = QUrl("qrc:/KStream/Content.qml");
     int _width = 640;
     int _height = 480;
-    int _framerate = 15;
+    int _framerate = 60;
     QSurfaceFormat * _surfaceFormat;
     QOpenGLContext * _qcontext;
     GstGLDisplay * _display;

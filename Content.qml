@@ -2,7 +2,9 @@ import QtQuick
 
 Item {
     Text{
+        id: t;
         text: "test"
+        color: "red"
         SequentialAnimation on x {
             loops: Animation.Infinite
             SmoothedAnimation { to: 50 }

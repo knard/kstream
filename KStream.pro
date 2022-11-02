@@ -16,7 +16,7 @@ CONFIG += link_pkgconfig
 
 DEFINES += GST_USE_UNSTABLE_API
 
-PKGCONFIG += gstreamer-1.0 gstreamer-app-1.0 gstreamer-gl-1.0 egl gstreamer-gl-egl-1.0
+PKGCONFIG += gstreamer-1.0 gstreamer-app-1.0 gstreamer-gl-1.0 egl gstreamer-gl-egl-1.0 wayland-client
 
 # Additional import path used to resolve QML modules in Qt Creator's code model
 QML_IMPORT_PATH =
