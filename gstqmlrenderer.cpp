@@ -22,6 +22,7 @@
 #include <QGuiApplication>
 #include <QAnimationDriver>
 #include <qpa/qplatformnativeinterface.h>
+#include <QQuickGraphicsDevice>
 
 GstQmlRenderer::GstQmlRenderer(QObject *parent)
     : QObject{parent}
@@ -75,6 +76,7 @@ void GstQmlRenderer::createWindow() {
     _qmlEngine = new QQmlEngine();
     _renderControl = new QQuickRenderControl();
     _quickWindow = new QQuickWindow(_renderControl);
+    _quickWindow->setGraphicsDevice(QQuickGraphicsDevice::fromOpenGLContext(_qcontext));
     if (!_qmlEngine->incubationController()) {
         _qmlEngine->setIncubationController(_quickWindow->incubationController());
     }
@@ -92,8 +94,9 @@ void GstQmlRenderer::createWindow() {
 }
 
 void GstQmlRenderer::createFramebuffer() {
+    _qcontext->makeCurrent(_offscreenSurface);
     _fbo = new QOpenGLFramebufferObject(_width,_height, QOpenGLFramebufferObject::CombinedDepthStencil, GL_TEXTURE_2D, GL_RGBA);
-    _fbo->takeTexture();
+    _qcontext->doneCurrent();
 }
 
 void GstQmlRenderer::setupRendering() {
@@ -111,7 +114,7 @@ gboolean sync_bus_call (GstBus * bus, GstMessage * msg, GstQmlRenderer * r)
           context_type;
 
       gst_message_parse_context_type (msg, &context_type);
-      g_print ("got need context %s\n", context_type);
+      g_print ("got need context %s for %s\n", context_type, gst_element_get_name(msg->src));
 
       if (g_strcmp0 (context_type, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
         GstContext *display_context = gst_context_new (GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
@@ -154,6 +157,7 @@ void GstQmlRenderer::createPipeline() {
     GstElement * videoconvert = gst_element_factory_make("videoconvert","renderer-convert");
     _queue = gst_element_factory_make("queue", "renderer-queue");
     //_vaapisink = gst_element_factory_make("waylandsink", "renderer-sink");
+    //_vaapisink = gst_element_factory_make("glimagesink", "renderer-sink");
     _vaapisink = gst_element_factory_make("vaapisink", "renderer-sink");
     gst_bin_add_many(GST_BIN (_pipeline), _appSource, _gldownload, videoconvert, _queue, _vaapisink, NULL);
     gst_element_link_many(_appSource, _gldownload, videoconvert, _queue, _vaapisink, NULL);
@@ -231,15 +235,9 @@ void GstQmlRenderer::render() {
     _renderControl->sync();
     _renderControl->render();
     _renderControl->endFrame();
-    _fbo->toImage().save(QString("toImgage-%1.png").arg(_fbo->texture()));
-    _qcontext->functions()->glBindTexture(GL_TEXTURE_2D, _fbo->texture());
-    QImage img(_width, _height, QImage::Format_RGBA8888);
-    _qcontext->functions()->glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, _width, _height, 0, GL_RGBA,  GL_UNSIGNED_INT_8_8_8_8_REV, img.bits());
-    img.save(QString("img-%1.png").arg(_fbo->texture()));
+    _qcontext->functions()->glFinish();
     TextureContext * pushContext = new TextureContext;
     pushContext->textureId = _fbo->takeTexture();
-    _qcontext->functions()->glBindTexture(GL_TEXTURE_2D, 0);
-    _qcontext->functions()->glFinish();
     pushContext->gstVideoInfo = _gstVideoInfo;
     pushContext->allocator = (GstGLBaseMemoryAllocator*)_gstMemoryAllocator;
     pushContext->appSource = _appSource;
@@ -251,8 +249,8 @@ void GstQmlRenderer::render() {
 
 void GstQmlRenderer::start() {
     createGlContexts();
-    createWindow();
     createFramebuffer();
+    createWindow();
     setupRendering();
     createPipeline();
     startPipeline();
